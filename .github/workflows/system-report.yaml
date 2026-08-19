@@ -46,7 +46,7 @@ jobs:
           EOF
 
       - name: Read one value from report.json using jq
-        run: echo "Project: $(jq -r '.project' report.json)"
+        run: echo $(jq -r '.project' report.json)
 
       - name: Print installed versions
         run: |
