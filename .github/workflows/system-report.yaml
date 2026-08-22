@@ -1,8 +1,8 @@
 name: System Report
 
 on:
-  push:
-
+  # push:
+  workflow_dispatch:
 jobs:
   system-info:
     runs-on: ubuntu-latest

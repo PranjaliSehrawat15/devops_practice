@@ -1,11 +1,11 @@
 name: Release Watcher
 
 on:
-    push:
-      branches:
-        - main
-    schedule:
-        - cron: '0 9 * * MON'
+    # push:
+    #   branches:
+    #     - main
+    # schedule:
+    #     - cron: '0 9 * * MON'
     workflow_dispatch:
 
 jobs:
