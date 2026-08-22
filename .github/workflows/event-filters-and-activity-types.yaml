@@ -7,7 +7,7 @@ on:
 
 
 jobs: 
-      echo:
-      runs-on: ubuntu-latest
-      steps: 
-          - run: echo "running whenever a PR is opened AND the base branch is main"
+  echo:
+    runs-on: ubuntu-latest
+    steps: 
+      - run: echo "running whenever a PR is opened AND the base branch is main"
