@@ -15,5 +15,5 @@ jobs:
              run: |
                 echo "goodbye"
                 exit 1
-           - name :after-goodbye
-             run :echo "after goodbye"
+           - name: after-goodbye
+             run: echo "after goodbye"

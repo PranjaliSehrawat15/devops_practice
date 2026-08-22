@@ -1,0 +1,59 @@
+name: System Report
+
+on:
+  push:
+
+jobs:
+  system-info:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print OS name and kernel version
+        run: |
+          echo "OS Name: $(uname -o)"
+          echo "Kernel Version: $(uname -r)"
+
+      - name: Print free disk space
+        run: df -h
+
+      - name: Print current date and time
+        run: |
+          echo "UTC date and Time:   $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+      - name: Install tree
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tree
+
+      - name: Show home directory tree (2 levels)
+        run: tree -L 2 "$HOME"
+
+  tool-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Create report.json
+        run: |
+          cat > report.json << 'EOF'
+          {
+            "project": "devops-practice",
+            "environment": "ci-runner",
+            "status": "ok"
+          }
+          EOF
+
+      - name: Read one value from report.json using jq
+        run: echo $(jq -r '.project' report.json)
+
+      - name: Print installed versions
+        run: |
+          python3 --version
+          git --version
+          jq --version
+
+      - name: Finish report
+        run: echo "Report complete"
+
