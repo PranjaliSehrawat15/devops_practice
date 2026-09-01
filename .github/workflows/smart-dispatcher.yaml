@@ -32,7 +32,7 @@ on:
         required: false
         type: string
 
-run-name: ${{ format('{0} | {1}{2}', inputs.risk_level | upper, inputs.owner, inputs.dry_run && ' | DRY-RUN' || '') }}
+run-name: ${{ format('{0} | {1}{2}', inputs.risk_level, inputs.owner, inputs.dry_run && ' | DRY-RUN' || '') }}
 
 jobs:
 
@@ -175,7 +175,7 @@ jobs:
       - name: Print dispatch summary
         run: |
           DRY_RUN_TEXT="${{ inputs.dry_run && 'DRY-RUN' || 'LIVE' }}"
-          echo "${{ format('Dispatch complete: {0} risk for {1} in {2} mode - CLOSED', inputs.risk_level | upper, inputs.owner, env.DRY_RUN_TEXT) }}"
+          echo "${{ format('Dispatch complete: {0} risk for {1} in {2} mode - CLOSED', inputs.risk_level, inputs.owner, env.DRY_RUN_TEXT) }}"
 
       - name: Close dispatcher
         run: |
