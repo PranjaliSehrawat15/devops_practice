@@ -61,6 +61,7 @@ jobs:
             echo "✗ Components do not mention 'auth'"
           fi
 
+
       - name: Validate owner and components format
         run: |
           # Check if owner starts with capital letter (A-Z)
