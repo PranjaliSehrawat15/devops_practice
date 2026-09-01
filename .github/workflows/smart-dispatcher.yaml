@@ -39,7 +39,6 @@ jobs:
   classify:
     name: Classify
     runs-on: ubuntu-latest
-
     steps:
       - name: Print components list
         run: |
