@@ -1,0 +1,148 @@
+name: Release Train
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  SERVICE_NAME: "node-service"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm test -- --coverage --watchAll=false --passWithNoTests
+      
+      - name: Print diagnostic information
+        run: |
+          echo "Node version:"
+          node --version
+          echo "npm version:"
+          npm --version
+          echo "Node binary location:"
+          which node
+
+  package:
+    needs: verify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+    
+    env:
+      DEPLOYMENT_TARGET: ${{ vars.DEPLOYMENT_TARGET }}
+      RELEASE_REF: ${{ env.SERVICE_NAME }}-${{ github.run_number }}-${{ github.sha | truncate(7) }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Generate release reference
+        id: release
+        run: |
+          COMMIT_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          RELEASE_REF="${{ env.SERVICE_NAME }}-${{ github.run_number }}-${COMMIT_SHORT}"
+          echo "release_ref=${RELEASE_REF}" >> $GITHUB_OUTPUT
+          echo "RELEASE_REF=${RELEASE_REF}" >> $GITHUB_ENV
+      
+      - name: Create release folder structure
+        run: |
+          mkdir -p release
+          
+          # Create metadata file
+          cat > release/${{ env.RELEASE_REF }}.txt << 'EOF'
+          Deployment Target: ${{ env.DEPLOYMENT_TARGET }}
+          Git Reference: ${{ github.ref }}
+          Triggered By: ${{ github.event_name }}
+          Actor: ${{ github.actor }}
+          Build Time: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          EOF
+          
+          # Copy files from app folder
+          cp package.json release/
+          cp README.md release/ 2>/dev/null || true
+      
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      
+      - name: Create manifest.json
+        run: |
+          cat > release/manifest.json << 'EOF'
+          {
+            "deploymentTarget": "${{ env.DEPLOYMENT_TARGET }}",
+            "gitRef": "${{ github.ref }}",
+            "event": "${{ github.event_name }}",
+            "actor": "${{ github.actor }}",
+            "buildTime": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
+            "releaseRef": "${{ env.RELEASE_REF }}"
+          }
+          EOF
+          
+          # Verify manifest parses correctly
+          echo "Verifying manifest.json..."
+          RELEASE_REF=$(jq -r '.releaseRef' release/manifest.json)
+          echo "Release reference from manifest: ${RELEASE_REF}"
+      
+      - name: Print release folder structure
+        run: |
+          echo "Release folder structure:"
+          tree release -L 2 || find release -type f -o -type d | head -20
+
+  announce:
+    needs: package
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Print release information
+        run: |
+          COMMIT_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          RELEASE_REF="${{ env.SERVICE_NAME }}-${{ github.run_number }}-${COMMIT_SHORT}"
+          
+          echo "Release Reference: ${RELEASE_REF}"
+          echo "Deployment Target: ${{ vars.DEPLOYMENT_TARGET }}"
+          echo "Service Name: ${{ env.SERVICE_NAME }}"
+      
+      - name: Announce event type
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "📢 ANNOUNCING RELEASE CANDIDATE"
+            echo "A new release candidate has been built from pull request #${{ github.event.pull_request.number }}"
+            echo "Branch: ${{ github.event.pull_request.head.ref }}"
+          else
+            echo "🚀 ANNOUNCING RELEASE"
+            echo "A new release has been packaged and is ready for deployment to production"
+            echo "Branch: ${{ github.ref }}"
+          fi
+      
+      - name: Release train complete
+        run: echo "✅ Release train complete"
+
+env:
+  SERVICE_NAME: "node-service"
