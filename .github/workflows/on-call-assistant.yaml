@@ -1,0 +1,123 @@
+name: On-Call Assistant
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: read
+  statuses: read
+  pull-requests: write
+
+env:
+  APP_NAME: "node-service"
+
+jobs:
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        run: npm test
+
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./app
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run build
+        run: npm run build
+
+
+  analyze:
+    name: Analyze
+    needs: [lint, test, build]
+    runs-on: ubuntu-latest
+    if: failure()
+
+    steps:
+      - name: Run SenseTheLog analysis
+        id: sensethelog
+        uses: SenseTheLogInc/sense-the-log@v1
+        with:
+          api_key: ${{ secrets.SENSETHELOG_API_KEY }}
+          run_id: ${{ github.run_id }}
+          repository: ${{ github.repository }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print analysis results
+        run: |
+          echo "=== SenseTheLog Analysis ==="
+          echo ""
+          echo "Is Recurring: ${{ steps.sensethelog.outputs.is_recurring }}"
+          echo "Error Signature: ${{ steps.sensethelog.outputs.error_signature }}"
+
+
+  notify-on-recurrence:
+    name: Notify on Recurrence
+    needs: analyze
+    runs-on: ubuntu-latest
+    if: needs.analyze.outputs.is_recurring == 'true'
+
+    steps:
+      - name: Recurrence detected
+        run: |
+          echo "⚠️  This exact failure has occurred before and should be treated as a priority fix rather than re-run and forgotten."
