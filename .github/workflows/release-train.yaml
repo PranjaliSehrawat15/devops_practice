@@ -50,7 +50,6 @@ jobs:
     
     env:
       DEPLOYMENT_TARGET: ${{ vars.DEPLOYMENT_TARGET }}
-      RELEASE_REF: ${{ env.SERVICE_NAME }}-${{ github.run_number }}-${{ github.sha | truncate(7) }}
     
     steps:
       - name: Checkout code
