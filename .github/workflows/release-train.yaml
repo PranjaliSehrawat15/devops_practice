@@ -49,7 +49,7 @@ jobs:
         working-directory: ./app
     
     env:
-      DEPLOYMENT_TARGET: ${{ vars.DEPLOYMENT_TARGET }}
+      DEPLOYMENT_TARGET: ${{ vars.DEPLOYMENT_TARGET || 'not-configured' }}
     
     steps:
       - name: Checkout code
