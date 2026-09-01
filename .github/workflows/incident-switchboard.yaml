@@ -1,0 +1,207 @@
+name: Incident Switchboard
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+    inputs:
+      severity:
+        description: "Incident severity"
+        required: true
+        default: low
+        type: choice
+        options:
+          - low
+          - medium
+          - high
+
+      deep_scan:
+        description: "Run a deep scan"
+        required: false
+        default: false
+        type: boolean
+
+      skip_tests:
+        description: "Skip tests"
+        required: false
+        default: false
+        type: boolean
+
+      reason:
+        description: "Reason for the incident run"
+        required: false
+        type: string
+
+
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch'
+      && format(
+        '{0} Incident{1}',
+        inputs.severity == 'low' && 'LOW' || inputs.severity == 'medium' && 'MEDIUM' || 'HIGH',
+        inputs.deep_scan && ' SCAN' || ''
+      )
+      || format('Automatic {0}', github.event_name) }}
+
+jobs:
+
+  triage:
+    name: Triage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print run information
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Started by: ${{ github.actor }}"
+          echo "Run number: ${{ github.run_number }}"
+
+      - name: Print manual inputs
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Severity: ${{ inputs.severity }}"
+          echo "Deep scan requested: ${{ inputs.deep_scan }}"
+          echo "Tests skipped: ${{ inputs.skip_tests }}"
+          echo "Reason: ${{ inputs.reason }}"
+
+      - name: Print automatic run information
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          echo "This run was automatic and no reason was supplied."
+
+      - name: Low severity
+        if: github.event_name == 'workflow_dispatch' && inputs.severity == 'low'
+        run: |
+          echo "LOW severity incident: standard triage is required."
+
+      - name: Medium severity
+        if: github.event_name == 'workflow_dispatch' && inputs.severity == 'medium'
+        run: |
+          echo "MEDIUM severity incident: increased attention is required."
+
+      - name: High severity
+        if: github.event_name == 'workflow_dispatch' && inputs.severity == 'high'
+        run: |
+          echo "HIGH severity incident: immediate attention is required."
+
+      - name: Automatic severity
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          echo "Automatic run: no manual severity was supplied."
+
+
+  tests:
+    name: Tests
+    needs: triage
+    if: github.event_name != 'workflow_dispatch' || inputs.skip_tests != true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Run tests
+        working-directory: app
+        run: npm test
+
+
+  scan:
+    name: Scan
+    needs: triage
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && (inputs.deep_scan == true || inputs.severity == 'high')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Create scan.json
+        env:
+          SEVERITY: ${{ inputs.severity }}
+          DEEP_SCAN: ${{ inputs.deep_scan }}
+          ACTOR: ${{ github.actor }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          jq -n \
+            --arg severity "$SEVERITY" \
+            --arg deep_scan "$DEEP_SCAN" \
+            --arg actor "$ACTOR" \
+            --arg run_number "$RUN_NUMBER" \
+            --arg time "$TIME" \
+            '{
+              severity: $severity,
+              deep_scan: ($deep_scan == "true"),
+              actor: $actor,
+              run_number: ($run_number | tonumber),
+              time_utc: $time
+            }' > scan.json
+
+          cat scan.json
+
+      - name: Read values with jq
+        run: |
+          echo "Severity: $(jq -r '.severity' scan.json)"
+          echo "Actor: $(jq -r '.actor' scan.json)"
+
+
+  report:
+    name: Report
+    needs:
+      - tests
+      - scan
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Report test result
+        run: |
+          echo "Tests job: ${{ needs.tests.result }}"
+
+      - name: Report scan result
+        run: |
+          echo "Scan job: ${{ needs.scan.result }}"
+
+      - name: Successful summary
+        if: >-
+          needs.tests.result != 'failure'
+          && needs.tests.result != 'cancelled'
+          && needs.scan.result != 'failure'
+          && needs.scan.result != 'cancelled'
+        run: |
+          echo "Switchboard completed successfully: every job that ran was successful."
+
+      - name: Failed summary
+        if: >-
+          needs.tests.result == 'failure'
+          || needs.tests.result == 'cancelled'
+          || needs.scan.result == 'failure'
+          || needs.scan.result == 'cancelled'
+        run: |
+          echo "Switchboard completed with failures in one or more jobs."
+
+      - name: Close switchboard
+        run: |
+          echo "Switchboard closed"

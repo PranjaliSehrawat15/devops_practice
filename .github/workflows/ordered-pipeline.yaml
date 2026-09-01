@@ -1,0 +1,45 @@
+name: Ordered Pipeline
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Print Setup done
+        run: echo "Setup done"
+
+  verify:
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Print Python version
+        run: python --version
+
+      - name: Print Verify done
+        run: echo "Verify done"
+
+  finish:
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - name: Print Pipeline finished
+        run: echo "Pipeline finished"

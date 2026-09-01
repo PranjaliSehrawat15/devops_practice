@@ -1,0 +1,28 @@
+name: Python Inspector
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Print Python and pip versions
+        run: |
+          python --version
+          pip --version
+
+      - name: Print Python binary location
+        run: which python
+
+      - name: Inspection complete
+        run: echo "Inspection complete"
